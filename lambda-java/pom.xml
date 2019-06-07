@@ -1,0 +1,71 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion> <!-- auto-generated pom (mvn archetype:generate ...) -->
+  <groupId>edu.ucsb.cs.course_support</groupId>
+  <artifactId>lambda-rekog</artifactId>
+  <packaging>jar</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>lambda-rekog</name>
+  <url>http://maven.apache.org</url>
+  <dependencies>
+    <dependency> <!-- Lambda Context object and Lambda-aware Java interfaces -->
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-core</artifactId>
+      <version>1.2.0</version>
+    </dependency>
+    <dependency> <!-- com.amazonaws.services.lambda.runtime.events.*; -->
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-lambda-java-events</artifactId>
+      <version>2.2.6</version>
+    </dependency>
+    <dependency> <!-- com.amazonaws.services.s3.event.S3EventNotification.*; -->
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-s3</artifactId>
+        <version>1.11.566</version>
+    </dependency>
+    <dependency> <!-- com.amazonaws.services.rekognition.*.* -->
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-java-sdk-rekognition</artifactId>
+        <version>1.11.566</version>
+    </dependency>
+    <dependency><!-- default unit test -->
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build>
+  <plugins>
+    <plugin> <!-- Use Java8 (only Java supported by AWS SDK/Lambda) -->
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-compiler-plugin</artifactId>
+      <version>3.8.1</version>
+      <configuration>
+         <source>1.8</source>
+         <target>1.8</target>
+      </configuration>
+    </plugin>
+    <plugin> <!-- package app into uberjar so that its self contained 
+	and can be executed locally -->
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-shade-plugin</artifactId>
+       <version>2.3</version>
+       <configuration>
+         <createDependencyReducedPom>false</createDependencyReducedPom>
+       </configuration>
+       <executions>
+         <execution>
+           <phase>package</phase>
+           <goals>
+             <goal>shade</goal>
+           </goals>
+         </execution>
+       </executions>
+     </plugin>
+  </plugins>
+  </build>
+  <properties> <!--if any lib uses text, specify format to avoid warnings -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+</project>
