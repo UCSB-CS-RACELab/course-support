@@ -10,6 +10,7 @@ import com.amazonaws.services.s3.event.*;
 import com.amazonaws.services.s3.event.S3EventNotification.*;
 import com.amazonaws.services.rekognition.*;
 import com.amazonaws.services.rekognition.model.*;
+import com.amazonaws.*; //for AmazonServiceException
 import org.json.simple.*;
 
 
@@ -33,6 +34,15 @@ public class LamRekog {
          * aws lambda invoke ...
          */
         JSONObject retn = new JSONObject();
+
+        //double check that the input objects are not null!
+        if (context == null || event == null) {
+            String err = "LamRekog:handler: context ("+context+
+                ") or event ("+event+") are null!";
+            retn.put("ERROR", err);
+            return retn;
+        }
+
         try{ 
             logger = context.getLogger(); 
             //print out the event to the log to see its structure
@@ -63,11 +73,9 @@ public class LamRekog {
         } catch (Exception e) {
             retn.put("ERROR", e.toString());
             if (logger != null) {
-                logger.log("Error in handler: " + e.getMessage());
-                logger.log(e.toString());
+                logger.log("LamRekog:handler: " + e.toString());
 	    } else {
-                System.err.println("Error in handler: " + e.getMessage());
-                System.err.println(e);
+                System.err.println("LamRekog:handler: " + e);
             }
         }
         return retn;
@@ -91,14 +99,36 @@ public class LamRekog {
          */
         AmazonRekognition client = AmazonRekognitionClientBuilder.standard().withRegion(preferred_region).build();
 
+        //prepare a default return value
+        JSONObject retn = new JSONObject();
+
         //pass in the bucket (bkt) and file name (fname) to Rekognition.
         //Doing so returns the labels and confidence for lables with 
 	//confidence higher than 90%
-        DetectLabelsRequest request = new DetectLabelsRequest()
-            .withImage(new Image().withS3Object(new S3Object()
-            .withBucket(bkt).withName(fname)))
-            .withMaxLabels(10).withMinConfidence(90f);
-        DetectLabelsResult response = client.detectLabels(request);
+        DetectLabelsResult response = null;
+        boolean ERROR = false;
+        String err = "unknown error";
+        try { //always catch exceptions from remote API calls!
+            DetectLabelsRequest request = new DetectLabelsRequest()
+                .withImage(new Image().withS3Object(new S3Object()
+                .withBucket(bkt).withName(fname)))
+                .withMaxLabels(10).withMinConfidence(90f);
+            response = client.detectLabels(request);
+        } catch (InvalidS3ObjectException e) {
+            err = "Rekognition Cannot access S3 Object";
+            ERROR = true;
+        } catch (AmazonServiceException e) {
+            err = "Unauthorized.  Are your credentials set in the environment variables?";
+            ERROR = true;
+        } catch (Exception e) {
+            err = e.getMessage();
+            ERROR = true;
+        }
+        if (ERROR || response == null) { //handle all error cases
+            retn.put("ERROR", err);
+            System.err.println("LamRekog:handler: "+ err);
+            return retn;
+        }
 
         // append the return values to a Java Map 
         Map<String, Float> lmap = new HashMap<>();
@@ -108,16 +138,16 @@ public class LamRekog {
 	int labelsCount = lmap.size();
 
         //Convert Java Map to a JSONObject
-        JSONObject json = new JSONObject(lmap);
+        retn = new JSONObject(lmap);
 
         //Print out the label list 
         if (logger != null) {
           logger.log("Total number of labels : " + labelsCount);
-          logger.log("labels : " + json);
+          logger.log("labels : " + retn);
         } else {
-	    System.err.println("Rekognition output: count: "+labelsCount + " labels: "+json);
+	    System.err.println("Rekognition output: count: "+labelsCount + " labels: "+retn);
         }
-        return json;
+        return retn;
     }
 
     //Entry point for command line invocation (local testing)
