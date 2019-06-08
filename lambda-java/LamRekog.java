@@ -6,9 +6,12 @@ import com.amazonaws.auth.profile.*;
 import com.amazonaws.regions.*;
 import com.amazonaws.services.lambda.runtime.*;
 import com.amazonaws.services.lambda.runtime.events.*;
+import com.amazonaws.services.s3.event.*;
 import com.amazonaws.services.s3.event.S3EventNotification.*;
 import com.amazonaws.services.rekognition.*;
 import com.amazonaws.services.rekognition.model.*;
+import org.json.simple.*;
+
 
 public class LamRekog {
 
@@ -23,32 +26,55 @@ public class LamRekog {
     final Regions preferred_region = Regions.US_WEST_2;
 
     //Entry point for AWS Lambda invocation
-    public void handler(S3Event event, Context context) {
-	/* Invokes the function in Lambda 
-           (triggered by an S3 update (source event)) 
+    public JSONObject handler(JSONObject event, Context context) {
+	/* AWS Lambda invokes this function, e.g. in response to 
+           (triggered by 
+         * an S3 update (source event) or a cli invocation:
+         * aws lambda invoke ...
          */
+        JSONObject retn = new JSONObject();
         try{ 
             logger = context.getLogger(); 
+            //print out the event to the log to see its structure
+            logger.log("Input event: " + event.toString());
     
-            for (S3EventNotificationRecord record : event.getRecords()) {
-                String s3Key = record.getS3().getObject().getKey();
-                String s3Bucket = record.getS3().getBucket().getName();
-                detectLabels(s3Bucket, s3Key);
-            }         
-    
+            /* Invoked via aws lambda invoke ... with payload containing a 
+             * key "eventSource", e.g. 
+             * aws lambda invoke --invocation-type RequestResponse --function-name lambda-rekog --region us-west-2 --profile myprofile --payload '{"eventSource":"ext:invokeCLI","name":"bktname","key":"foldername/fname.jpg"}' outputfile
+		--invocation-type can be RequestResponse (sync) or Event (async)
+             */
+            if (event.containsKey("eventSource")) { //passed in via invoke CLI
+                String s3Bucket = (String) event.get("name");
+                String s3Key = (String) event.get("key");
+                retn = detectLabels(s3Bucket, s3Key);
+
+            } else {
+            /* Invoked by AWS lambda via an S3Event (all other event
+	     * types will cause an exception).
+             */
+                S3EventNotification notif = S3EventNotification.parseJson(event.toString()); 
+                for (S3EventNotificationRecord record : notif.getRecords()) {
+                    String s3Key = record.getS3().getObject().getKey();
+                    String s3Bucket = record.getS3().getBucket().getName();
+                    logger.log("Rekognition args: " + s3Bucket + ", "+s3Key);
+                    retn = detectLabels(s3Bucket, s3Key);
+                }         
+     	    } 
         } catch (Exception e) {
+            retn.put("ERROR", e.toString());
             if (logger != null) {
-                logger.log("Error: " + e.getMessage());
+                logger.log("Error in handler: " + e.getMessage());
                 logger.log(e.toString());
 	    } else {
-                System.err.println("Error: " + e.getMessage());
+                System.err.println("Error in handler: " + e.getMessage());
                 System.err.println(e);
             }
         }
+        return retn;
 
     }
 
-    void detectLabels(String bkt, String fname) {
+    JSONObject detectLabels(String bkt, String fname) {
         /* Request labels from image file named filename in S3 bucket bkt
          * use 90% confidence limit and top 10 labels.
          * This method is invoked by main (local/test) 
@@ -74,21 +100,24 @@ public class LamRekog {
             .withMaxLabels(10).withMinConfidence(90f);
         DetectLabelsResult response = client.detectLabels(request);
 
-        // append the return values to a Java list 
-	int labelsCount = 0;
-        List<String> labels = new ArrayList<>();
+        // append the return values to a Java Map 
+        Map<String, Float> lmap = new HashMap<>();
 	for (Label label : response.getLabels()) {
-            String str = new String(label.getName() + ":" + label.getConfidence());
- 	    labels.add(str);
-	    labelsCount++;
+            lmap.put(label.getName(),label.getConfidence());
     	}
+	int labelsCount = lmap.size();
+
+        //Convert Java Map to a JSONObject
+        JSONObject json = new JSONObject(lmap);
+
         //Print out the label list 
         if (logger != null) {
           logger.log("Total number of labels : " + labelsCount);
-          logger.log("labels : " + labels);
+          logger.log("labels : " + json);
         } else {
-	    System.err.println("count: "+labelsCount + " labels: "+labels);
+	    System.err.println("Rekognition output: count: "+labelsCount + " labels: "+json);
         }
+        return json;
     }
 
     //Entry point for command line invocation (local testing)
@@ -100,16 +129,17 @@ public class LamRekog {
 	//set the name of the file and the bucket in S3 for Rekognition
         String s3Key = "cjkltestfolder/badger1.jpg";
         String s3Bucket = "cjkltestbkt";
-
+        JSONObject retn = new JSONObject();
         try{ 
-            obj.detectLabels(s3Bucket, s3Key);
+	    /* Call rekognition directly passing in an S3 bucket and filename
+	     * filename must be at the top level or have a folder followed
+	     * by a slash as in the s3Key variable above.
+	     */
+            retn = obj.detectLabels(s3Bucket, s3Key);
         } catch (Exception e) {
-            if (obj != null && obj.logger != null) {
-		obj.logger.log("Error: " + e.getMessage());
-	    } else {
-		System.err.println("Error: " + e.getMessage());
-            }
+	    System.err.println("Error in main: " + e.getMessage());
         }
+        System.err.println("\nReturning from main: "+retn);
 
     }
 }
