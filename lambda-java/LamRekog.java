@@ -4,6 +4,8 @@ import java.util.*;
 import com.amazonaws.auth.*;
 import com.amazonaws.auth.profile.*;
 import com.amazonaws.regions.*;
+import com.amazonaws.services.lambda.*;
+import com.amazonaws.services.lambda.model.*;
 import com.amazonaws.services.lambda.runtime.*;
 import com.amazonaws.services.lambda.runtime.events.*;
 import com.amazonaws.services.s3.event.*;
@@ -70,6 +72,13 @@ public class LamRekog {
                     retn = detectLabels(s3Bucket, s3Key);
                 }         
      	    } 
+
+            /* Uncomment this to invoke another Lambda function
+             * review the code to make sure that the function exists 
+	     * prior to doing this
+             */
+            retn.put("LamRekog:handler",invokeLambda());
+
         } catch (Exception e) {
             retn.put("ERROR", e.toString());
             if (logger != null) {
@@ -147,6 +156,41 @@ public class LamRekog {
         } else {
 	    System.err.println("Rekognition output: count: "+labelsCount + " labels: "+retn);
         }
+        return retn;
+    }
+	    
+    //This method invokes another AWS Lambda function
+    JSONObject invokeLambda() {
+
+        //setup the return object
+        JSONObject retn = new JSONObject();
+
+        //setup the service client (credentials)
+        AWSLambda lambda = AWSLambdaClientBuilder.standard().withRegion(preferred_region).build();
+
+        /* Setup the function to call.
+         * fname must be the name of a function that you have listed
+         * in the AWS Lambda console in preferred_region!
+         *
+         * You can call Lambda functions in other languages (e.g. python) too!
+         * Make sure never to call yourself (=infinite loop and lots of $$)!
+         */
+        String fname = "lambda-simple"; 
+        //write this to the logs
+        System.err.println("Calling invoke on Lambda "+fname);
+        String msg = "Calling "+fname;
+
+        //setup the AWS Lambda invocation request
+        JSONObject payload = new JSONObject();
+        payload.put("LamRekog:invokeLambda", msg);
+        InvokeRequest invokeRequest = new InvokeRequest();
+	invokeRequest.setInvocationType( InvocationType.RequestResponse ); //synchronous
+	invokeRequest.setFunctionName( fname ); 
+	invokeRequest.setPayload( payload.toString() );
+
+        //make the call
+        InvokeResult val = lambda.invoke( invokeRequest );
+        retn.put("LamRekog:invokeLambda",val.toString());
         return retn;
     }
 
