@@ -73,10 +73,6 @@ public class LamRekog {
                 }         
      	    } 
 
-            /* Uncomment this to invoke another Lambda function
-             * review the code to make sure that the function exists 
-	     * prior to doing this
-             */
             retn.put("LamRekog:handler",invokeLambda());
 
         } catch (Exception e) {
@@ -165,33 +161,15 @@ public class LamRekog {
         //setup the return object
         JSONObject retn = new JSONObject();
 
-        //setup the service client (credentials)
-        AWSLambda lambda = AWSLambdaClientBuilder.standard().withRegion(preferred_region).build();
-
-        /* Setup the function to call.
-         * fname must be the name of a function that you have listed
-         * in the AWS Lambda console in preferred_region!
-         *
-         * You can call Lambda functions in other languages (e.g. python) too!
-         * Make sure never to call yourself (=infinite loop and lots of $$)!
+	/* Add your code here: 
+	 * 1) setup client with environment credentials 
+	 * 2) setup InvokeRequest with payload appropriate for function handler
+	 * 3) invoke lambda-simple (or other named) Lambda function synchronously
+	 * 4) get response and add it to retn using key LamRekog:invokeLambda
+	 * 5) return retn to caller (done below)
          */
-        String fname = "lambda-simple"; 
-        //write this to the logs
-        System.err.println("Calling invoke on Lambda "+fname);
-        String msg = "Calling "+fname;
 
-        //setup the AWS Lambda invocation request
-        JSONObject payload = new JSONObject();
-        payload.put("LamRekog:invokeLambda", msg);
-        InvokeRequest invokeRequest = new InvokeRequest();
-	invokeRequest.setInvocationType( InvocationType.RequestResponse ); //synchronous
-	invokeRequest.setFunctionName( fname ); 
-	invokeRequest.setPayload( payload.toString() );
-
-        //make the call
-        InvokeResult val = lambda.invoke( invokeRequest );
-        retn.put("LamRekog:invokeLambda",val.toString());
-        return retn;
+         return retn;
     }
 
     //Entry point for command line invocation (local testing)
