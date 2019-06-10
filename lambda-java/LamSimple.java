@@ -1,9 +1,11 @@
 package edu.ucsb.cs.course_support;
 
+import java.util.*; //for Map
 import com.amazonaws.regions.*;
 import com.amazonaws.services.lambda.runtime.*;
 import com.amazonaws.services.lambda.runtime.events.*;
 import org.json.simple.*;
+import org.json.simple.parser.*;
 
 public class LamSimple {
 
@@ -28,15 +30,38 @@ public class LamSimple {
          */
         if (context != null) {
             logger = context.getLogger(); 
-            //print out the event to the log to see its structure
-            logger.log("LamSimple event: " + event.toString());
+            //print out event, context, and environment to the log 
+            String envstr = "empty";
+            if (event != null){
+                envstr = event.toString();
+            }
+            //get the environment variables
+            String envvars = "Environment Variables\n";
+            Map<String, String> env = System.getenv();
+            for (Map.Entry<String, String> entry : env.entrySet()) {
+                envvars += (entry.getKey()+" : "+entry.getValue()+"\n");
+            }
+
+	    logger.log("LamSimple:handler: \n\tevent: "+envstr
+	        + "\n\tcontext: "+context.toString()
+	        + "\n"+envvars);
         } else {
             System.err.println("LamSimple (invoked internally) event: " + event.toString());
         }
 
+        //convert event.keySet to JSONArray of Strings
+        JSONArray jary = new JSONArray();
+        for (Object k : event.keySet()) {
+            String strele = (String)k;
+            jary.add(strele);
+        }
+            
         //prepare an object to return
         JSONObject retn = new JSONObject();
-        retn.put("LamSimple:handler", event.keySet());
+        retn.put("statusCode", 200);
+        retn.put("fname", "LamSimple:handler");
+        retn.put("body", jary);
+        System.err.println("LamSimple:handler returning: "+retn);
         return retn;
 
     }
@@ -48,17 +73,21 @@ public class LamSimple {
         LamSimple obj = new LamSimple();
 
 	//create an argument for the handler
-        JSONObject handler_args = new JSONObject();
-        String val = "no_args";
-        if (args.length > 1){
+        String val = "{\"no_args\":\"no_args\"}";
+        if (args.length >= 1){
             val = args[0];
         }
-        handler_args.put("LamSimple:Main", val);
+        JSONParser parser = new JSONParser();
+        JSONObject handler_args = new JSONObject();
+        try {
+            handler_args = (JSONObject) parser.parse(val);
+        } catch (Exception e) { 
+            System.err.println(e);
+        } //the initialization (empty) object will pass through
 
         //invoke the handler directly
-        System.err.println("LamSimple:Main calling handler");
         JSONObject retn = obj.handler(handler_args,null);
-        System.err.println("LamSimple:Main handler returned: "+retn);
+        System.err.println("LamSimple:main returning: "+retn);
 
     }
 }
