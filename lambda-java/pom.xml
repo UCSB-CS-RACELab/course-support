@@ -21,7 +21,7 @@
     <dependency> <!-- com.amazonaws.services.s3.event.S3EventNotification.*; -->
         <groupId>com.amazonaws</groupId>
         <artifactId>aws-java-sdk-s3</artifactId>
-        <version>1.11.566</version>
+        <version>1.12.261</version>
     </dependency>
     <dependency> <!-- com.amazonaws.services.lambda.*; -->
         <groupId>com.amazonaws</groupId>
